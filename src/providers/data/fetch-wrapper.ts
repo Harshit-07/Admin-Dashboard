@@ -1,11 +1,10 @@
 import { GraphQLFormattedError } from "graphql";
 
-interface Error {
+type Error = {
   message: string;
   statusCode: string;
-}
+};
 
-//Acts as Middleware
 const customFetch = async (url: string, options: RequestInit) => {
   const accessToken = localStorage.getItem("access_token");
   const headers = options.headers as Record<string, string>;
@@ -21,7 +20,20 @@ const customFetch = async (url: string, options: RequestInit) => {
   });
 };
 
-//Custom error handler fn()
+export const fetchWrapper = async (url: string, options: RequestInit) => {
+  const response = await customFetch(url, options);
+
+  const responseClone = response.clone();
+  const body = await responseClone.json();
+  const error = getGraphQLErrors(body);
+
+  if (error) {
+    throw error;
+  }
+
+  return response;
+};
+
 const getGraphQLErrors = (
   body: Record<"errors", GraphQLFormattedError[] | undefined>
 ): Error | null => {
@@ -34,7 +46,6 @@ const getGraphQLErrors = (
 
   if ("errors" in body) {
     const errors = body?.errors;
-
     const messages = errors?.map((error) => error?.message)?.join("");
     const code = errors?.[0]?.extensions?.code;
 
@@ -44,19 +55,5 @@ const getGraphQLErrors = (
     };
   }
 
-  return null; //Return null if no body and errors are there
-};
-
-export const fetchWrapper = async (url: string, options: RequestInit) => {
-  const response = await customFetch(url, options);
-  const responseClone = response.clone(); //Clone response to use it further
-  const body = await responseClone.json();
-
-  const error = getGraphQLErrors(body);
-
-  if (error) {
-    throw error;
-  }
-
-  return response;
+  return null;
 };
